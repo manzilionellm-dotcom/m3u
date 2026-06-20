@@ -40,11 +40,25 @@ function safeHost(url: string): string {
   }
 }
 
-export function upstreamFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const a = getAgent();
+export function upstreamFetch(
+  input: string,
+  init: RequestInit = {},
+  opts: { useProxy?: boolean } = {},
+): Promise<Response> {
+  // Default to using the proxy (when configured) unless explicitly disabled.
+  const a = opts.useProxy === false ? undefined : getAgent();
   if (a) {
     // `dispatcher` is an undici extension accepted by Node's global fetch.
     return fetch(input, { ...init, dispatcher: a } as RequestInit & { dispatcher: ProxyAgent });
   }
   return fetch(input, init);
+}
+
+/**
+ * Heavy media segments (video/audio chunks) — these should usually bypass the
+ * residential proxy to avoid huge per-GB costs, since most providers only block
+ * the playlist endpoint, not the segment CDN.
+ */
+export function isLikelyMediaSegment(url: string): boolean {
+  return /\.(ts|m4s|mp4|m4a|aac|mp3|webm|mkv|avi)(?:$|\?)/i.test(url);
 }

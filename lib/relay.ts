@@ -1,5 +1,5 @@
 import { config } from "./config";
-import { upstreamFetch } from "./fetch";
+import { isLikelyMediaSegment, upstreamFetch } from "./fetch";
 import { buildRelayUrl, looksLikeManifest, rewriteManifest } from "./m3u";
 import { manifestCache } from "./runtime";
 
@@ -97,15 +97,24 @@ export async function proxyTarget(opts: {
     };
   }
 
+  // Route small manifests/keys through the residential proxy; let heavy media
+  // segments go direct from the VPS (cost control). Override with PROXY_SEGMENTS=1.
+  const useProxy =
+    process.env.PROXY_SEGMENTS === "1" || !isLikelyMediaSegment(targetUrl);
+
   let upstream: Response;
   try {
-    upstream = await upstreamFetch(targetUrl, {
-      method,
-      headers: upstreamHeaders(incoming, targetUrl),
-      redirect: "follow",
-      // Never let Next cache the proxied origin response.
-      cache: "no-store",
-    });
+    upstream = await upstreamFetch(
+      targetUrl,
+      {
+        method,
+        headers: upstreamHeaders(incoming, targetUrl),
+        redirect: "follow",
+        // Never let Next cache the proxied origin response.
+        cache: "no-store",
+      },
+      { useProxy },
+    );
   } catch {
     return {
       response: Response.json({ error: "Upstream fetch failed" }, { status: 502 }),
