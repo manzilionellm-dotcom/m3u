@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { config } from "@/lib/config";
 import { safeEqual } from "@/lib/crypto";
+import { upstreamFetch } from "@/lib/fetch";
 import { clientIp, clientUa, publicBaseUrl } from "@/lib/http";
 import { buildRelayUrl, looksLikeManifest, rewriteManifest } from "@/lib/m3u";
 import { maybeSweep, rateLimit } from "@/lib/ratelimit";
@@ -78,8 +79,11 @@ export async function GET(
   let cacheState: "hit" | "miss";
   try {
     const result = await sourceCache.wrap(source.url, config.upstreamCacheTtl, async () => {
-      const res = await fetch(source.url, {
-        headers: { "user-agent": "Mozilla/5.0 (compatible; M3URelay/1.0)", accept: "*/*" },
+      const res = await upstreamFetch(source.url, {
+        headers: {
+          "user-agent": process.env.UPSTREAM_USER_AGENT || "VLC/3.0.20 LibVLC/3.0.20",
+          accept: "*/*",
+        },
         cache: "no-store",
         redirect: "follow",
       });
@@ -89,7 +93,8 @@ export async function GET(
     });
     body = result.value;
     cacheState = result.cache;
-  } catch {
+  } catch (err) {
+    console.warn(`[m3u] Échec récupération source (${source.url}):`, (err as Error).message);
     log(502, 0, "bypass");
     return new Response("#EXTM3U\n# Upstream unavailable\n", { status: 502 });
   }

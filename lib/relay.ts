@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { upstreamFetch } from "./fetch";
 import { buildRelayUrl, looksLikeManifest, rewriteManifest } from "./m3u";
 import { manifestCache } from "./runtime";
 
@@ -98,7 +99,7 @@ export async function proxyTarget(opts: {
 
   let upstream: Response;
   try {
-    upstream = await fetch(targetUrl, {
+    upstream = await upstreamFetch(targetUrl, {
       method,
       headers: upstreamHeaders(incoming, targetUrl),
       redirect: "follow",
